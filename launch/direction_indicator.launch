@@ -6,5 +6,9 @@
     <include file="$(find audio_compass)/launch/speech_generator.launch"/>
 
     <!-- 启动方向指示器节点 -->
-    <node pkg="direction_indicator" type="direction_indicator_node" name="direction_indicator" output="screen" />
+    <node pkg="direction_indicator" type="direction_indicator_node" name="direction_indicator" output="screen">
+        <!-- 增加重新启动选项 -->
+        <param name="respawn" value="true"/>
+        <param name="respawn_delay" value="5"/>
+    </node>
 </launch>

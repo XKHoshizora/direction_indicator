@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 catkin_package(
     INCLUDE_DIRS include
+    LIBRARIES direction_calculator state_machine tts_client
     CATKIN_DEPENDS
         roscpp
         std_msgs
@@ -28,23 +29,60 @@ include_directories(
     ${catkin_INCLUDE_DIRS}
 )
 
-add_executable(${PROJECT_NAME}_node
-    src/direction_indicator_node.cpp
+# Build libraries
+add_library(direction_calculator
     src/direction_calculator.cpp
+)
+
+add_library(state_machine
     src/state_machine.cpp
 )
 
-add_dependencies(${PROJECT_NAME}_node
-    ${${PROJECT_NAME}_EXPORTED_TARGETS}
-    ${catkin_EXPORTED_TARGETS}
+add_library(tts_client
+    src/tts_client.cpp
 )
 
-target_link_libraries(${PROJECT_NAME}_node
+# Link libraries
+target_link_libraries(direction_calculator
     ${catkin_LIBRARIES}
 )
 
+target_link_libraries(state_machine
+    ${catkin_LIBRARIES}
+    tts_client
+)
+
+target_link_libraries(tts_client
+    ${catkin_LIBRARIES}
+)
+
+# Build executable
+add_executable(${PROJECT_NAME}_node
+    src/direction_indicator_node.cpp
+)
+
+target_link_libraries(${PROJECT_NAME}_node
+    direction_calculator
+    state_machine
+    tts_client
+    ${catkin_LIBRARIES}
+)
+
+# Install
 install(TARGETS ${PROJECT_NAME}_node
     RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(TARGETS direction_calculator state_machine tts_client
+    ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+    RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+)
+
+install(DIRECTORY include/${PROJECT_NAME}/
+    DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+    FILES_MATCHING PATTERN "*.h" "*.hpp"
+    PATTERN ".svn" EXCLUDE
 )
 
 install(DIRECTORY launch/
