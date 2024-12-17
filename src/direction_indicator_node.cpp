@@ -91,11 +91,11 @@ private:
     }
 
 private:
-    ros::NodeHandle nh_;                           // ROS节点句柄
-    ros::Subscriber pathSub_;                      // 路径订阅者
-    DirectionCalculator calculator_;               // 方向计算器
-    std::unique_ptr<StateMachine> stateMachine_;   // 状态机
-    double lookAheadDistance_;                     // 前瞻距离参数
+    ros::NodeHandle nh_;                               // ROS节点句柄
+    ros::Subscriber pathSub_;                          // 路径订阅者
+    std::unique_ptr<DirectionCalculator> calculator_;  // 方向计算器
+    std::unique_ptr<StateMachine> stateMachine_;       // 状态机
+    double lookAheadDistance_;                         // 前瞻距离参数
 };
 
 int main(int argc, char** argv) {

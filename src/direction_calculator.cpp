@@ -26,10 +26,6 @@ void DirectionCalculator::cmdVelCallback(const geometry_msgs::TwistConstPtr& msg
 }
 
 bool DirectionCalculator::isRotatingInPlace(const nav_msgs::Path& path, double angular_velocity_threshold) {
-    if (!velocity_initialized_) {
-        return false;
-    }
-
     // 检查线速度是否接近0且角速度大于阈值
     bool is_still = std::abs(current_vel_.linear.x) < linear_velocity_threshold_ &&
                    std::abs(current_vel_.linear.y) < linear_velocity_threshold_;
