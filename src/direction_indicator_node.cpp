@@ -12,7 +12,7 @@ public:
         nh_.param("/direction_indicator/look_ahead_distance", lookAheadDistance_, 1.5);
 
         // 初始化订阅者
-        pathSub_ = nh_.subscribe("/move_base/NavfnROS/plan", 1,
+        pathSub_ = nh_.subscribe("/move_base/GlobalPlanner/plan", 1,
                               &DirectionIndicatorNode::pathCallback, this);
         status_sub_ = nh_.subscribe("/move_base/status", 1,
                                  &DirectionIndicatorNode::moveBaseStatusCallback, this);
