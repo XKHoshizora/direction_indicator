@@ -1,0 +1,15 @@
+# config/direction_indicator_params.yaml
+
+direction_indicator:
+    # 路径分析参数
+    look_ahead_distance: 1.5      # 前瞻距离 (meters)
+    turn_threshold_degrees: 20.0  # 转向角度阈值 (degrees)
+    state_change_delay: 2.0      # 状态改变最小时间间隔 (seconds)
+
+    # 速度阈值
+    linear_velocity_threshold: 0.05    # m/s
+    angular_velocity_threshold: 0.1    # rad/s
+
+    # 提示控制
+    voice_enable: true           # 是否启用语音提示
+    early_warning_distance: 1.5  # 提前预警距离 (meters)

@@ -1,0 +1,11 @@
+<!-- launch/direction_indicator.launch -->
+<launch>
+    <!-- Load parameters -->
+    <rosparam command="load" file="$(find direction_indicator)/config/direction_indicator_params.yaml" />
+
+    <!-- Start the direction indicator node -->
+    <node pkg="direction_indicator" type="direction_indicator_node" name="direction_indicator" output="screen" />
+
+    <!-- Include audio compass for TTS functionality -->
+    <include file="$(find audio_compass)/launch/speech_generator.launch" />
+</launch>
