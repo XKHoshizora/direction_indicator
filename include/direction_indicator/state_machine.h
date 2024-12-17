@@ -33,4 +33,5 @@ private:
     ros::ServiceClient ttsClient;
     ros::Time lastStateChange;
     double stateChangeDelay;
+    bool voice_enable_;
 };

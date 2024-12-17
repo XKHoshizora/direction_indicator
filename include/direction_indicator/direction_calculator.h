@@ -36,6 +36,9 @@ private:
     tf2_ros::Buffer tfBuffer;
     tf2_ros::TransformListener tfListener;
     double turnThreshold;  // Angle threshold for turn detection (radians)
+    double linear_velocity_threshold_;  // 线速度阈值
+    double angular_velocity_threshold_;  // 角速度阈值
+    double early_warning_distance_;  // 提前预警距离
 
     ros::Subscriber cmd_vel_sub_;      // 订阅速度指令
     geometry_msgs::Twist current_vel_; // 当前速度

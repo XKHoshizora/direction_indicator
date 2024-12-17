@@ -3,12 +3,22 @@
 #include <cmath>
 
 DirectionCalculator::DirectionCalculator() : tfListener(tfBuffer) {
-    turnThreshold = M_PI / 9.0;  // 20 degrees in radians
+    ros::NodeHandle nh("~");
 
-    ros::NodeHandle nh;
-    cmd_vel_sub_ = nh.subscribe("/cmd_vel", 1,
-                               &DirectionCalculator::cmdVelCallback,
-                               this);
+    // 从参数服务器获取配置
+    double turn_threshold_degrees;
+    nh.param("/direction_indicator/turn_threshold_degrees", turn_threshold_degrees, 20.0);
+    turnThreshold = turn_threshold_degrees * M_PI / 180.0;  // 转换为弧度
+
+    // 获取速度阈值
+    nh.param("/direction_indicator/linear_velocity_threshold", linear_velocity_threshold_, 0.05);
+    nh.param("/direction_indicator/angular_velocity_threshold", angular_velocity_threshold_, 0.1);
+
+    // 获取预警距离
+    nh.param("/direction_indicator/early_warning_distance", early_warning_distance_, 1.5);
+
+    // 初始化速度订阅
+    cmd_vel_sub_ = nh.subscribe("/cmd_vel", 1, &DirectionCalculator::cmdVelCallback, this);
 }
 
 void DirectionCalculator::cmdVelCallback(const geometry_msgs::TwistConstPtr& msg) {
@@ -16,10 +26,14 @@ void DirectionCalculator::cmdVelCallback(const geometry_msgs::TwistConstPtr& msg
 }
 
 bool DirectionCalculator::isRotatingInPlace(const nav_msgs::Path& path, double angular_velocity_threshold) {
+    if (!velocity_initialized_) {
+        return false;
+    }
+
     // 检查线速度是否接近0且角速度大于阈值
-    bool is_still = std::abs(current_vel_.linear.x) < 0.05 &&
-                   std::abs(current_vel_.linear.y) < 0.05;
-    bool is_rotating = std::abs(current_vel_.angular.z) > angular_velocity_threshold;
+    bool is_still = std::abs(current_vel_.linear.x) < linear_velocity_threshold_ &&
+                   std::abs(current_vel_.linear.y) < linear_velocity_threshold_;
+    bool is_rotating = std::abs(current_vel_.angular.z) > angular_velocity_threshold_;
 
     return is_still && is_rotating;
 }

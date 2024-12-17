@@ -9,7 +9,8 @@
 class DirectionIndicatorNode {
 public:
     DirectionIndicatorNode() : nh_("~") {
-        // 加载参数
+        // 从参数服务器获取参数
+        double look_ahead_distance;
         nh_.param("look_ahead_distance", lookAheadDistance_, 1.5);  // 前瞻距离，默认1.5米
 
         // 订阅全局路径规划
@@ -20,7 +21,8 @@ public:
         status_sub_ = nh_.subscribe("/move_base/status", 1,
                                   &DirectionIndicatorNode::moveBaseStatusCallback, this);
 
-        // 初始化状态机
+        // 初始化各个组件
+        calculator_ = std::make_unique<DirectionCalculator>();
         stateMachine_ = std::make_unique<StateMachine>(nh_);
 
         ROS_INFO("Direction Indicator Node initialized with look_ahead_distance: %.2f", lookAheadDistance_);

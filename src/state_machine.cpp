@@ -2,10 +2,15 @@
 #include "direction_indicator/state_machine.h"
 
 StateMachine::StateMachine(ros::NodeHandle& nh)
-    : currentState(State::STRAIGHT),
-      lastStateChange(ros::Time::now()),
-      stateChangeDelay(2.0) {
+    : currentState(State::STRAIGHT) {
 
+    // 获取参数
+    nh.param("/direction_indicator/state_change_delay", stateChangeDelay, 2.0);
+    nh.param("/direction_indicator/voice_enable", voice_enable_, true);
+
+    lastStateChange = ros::Time::now();
+
+    // 初始化发布者和服务客户端
     directionPub = nh.advertise<std_msgs::String>("/direction_indicator", 1);
     ttsClient = nh.serviceClient<audio_compass::TextToSpeech>("/text_to_speech");
 }
@@ -107,6 +112,10 @@ void StateMachine::transitionTo(State newState) {
 }
 
 void StateMachine::speakDirectionChange(const std::string& text) {
+    if (!voice_enable_) {
+        return;
+    }
+
     audio_compass::TextToSpeech srv;
     srv.request.text = text;
 
