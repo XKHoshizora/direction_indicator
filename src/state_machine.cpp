@@ -64,6 +64,9 @@ void StateMachine::update(DirectionCalculator::Direction direction) {
 }
 
 void StateMachine::transitionTo(State newState) {
+    ROS_INFO_STREAM("State transition: " << static_cast<int>(currentState)
+                    << " -> " << static_cast<int>(newState));
+
     std::string speechText;
     std::string direction;
 
@@ -85,12 +88,12 @@ void StateMachine::transitionTo(State newState) {
 
         case State::TURNING_LEFT_IN_PLACE:
             direction = "ROTATE_LEFT";
-            speechText = "原地左转";
+            speechText = "正在左转";
             break;
 
         case State::TURNING_RIGHT_IN_PLACE:
             direction = "ROTATE_RIGHT";
-            speechText = "原地右转";
+            speechText = "正在右转";
             break;
 
         case State::STOP_ANTICIPATED:
@@ -104,15 +107,20 @@ void StateMachine::transitionTo(State newState) {
             break;
     }
 
+    // 发布方向
     publishDirection(direction);
-    speakDirectionChange(speechText);
 
-    currentState = newState;
-    lastStateChange = ros::Time::now();
+    // 只有在状态真正改变时才播放语音
+    if (currentState != newState) {
+        speakDirectionChange(speechText);
+        currentState = newState;
+        lastStateChange = ros::Time::now();
+    }
 }
 
 void StateMachine::speakDirectionChange(const std::string& text) {
     if (!voice_enable_) {
+        ROS_DEBUG("Voice prompts are disabled");
         return;
     }
 
@@ -120,7 +128,9 @@ void StateMachine::speakDirectionChange(const std::string& text) {
     srv.request.text = text;
 
     if (!ttsClient.call(srv)) {
-        ROS_ERROR("Failed to call TTS service");
+        ROS_ERROR("Failed to call TTS service for text: %s", text.c_str());
+    } else {
+        ROS_INFO("Speaking: %s", text.c_str());
     }
 }
 
