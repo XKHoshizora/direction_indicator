@@ -64,11 +64,12 @@ void StateMachine::update(DirectionCalculator::Direction direction) {
 }
 
 void StateMachine::transitionTo(State newState) {
-    ROS_INFO_STREAM("State transition: " << static_cast<int>(currentState)
-                    << " -> " << static_cast<int>(newState));
+    if (currentState == newState) {
+        return;
+    }
 
-    std::string speechText;
     std::string direction;
+    std::string speechText;
 
     switch (newState) {
         case State::STRAIGHT:
@@ -88,12 +89,12 @@ void StateMachine::transitionTo(State newState) {
 
         case State::TURNING_LEFT_IN_PLACE:
             direction = "ROTATE_LEFT";
-            speechText = "正在左转";
+            speechText = "开始左转";
             break;
 
         case State::TURNING_RIGHT_IN_PLACE:
             direction = "ROTATE_RIGHT";
-            speechText = "正在右转";
+            speechText = "开始右转";
             break;
 
         case State::STOP_ANTICIPATED:
@@ -107,14 +108,60 @@ void StateMachine::transitionTo(State newState) {
             break;
     }
 
+    ROS_INFO("状态转换: %s, 播放语音: %s", direction.c_str(), speechText.c_str());
+
     // 发布方向
     publishDirection(direction);
 
-    // 只有在状态真正改变时才播放语音
-    if (currentState != newState) {
-        speakDirectionChange(speechText);
-        currentState = newState;
-        lastStateChange = ros::Time::now();
+    // 异步播放语音
+    async_speak(speechText);
+
+    // 更新状态
+    currentState = newState;
+    lastStateChange = ros::Time::now();
+}
+
+
+    // 异步调用tts服务
+void StateMachine::async_speak(const std::string& text) {
+    // 如果上一个语音还在播放，等待完成
+    if (tts_thread_ && tts_thread_->joinable()) {
+        tts_thread_->join();
+    }
+
+    // 创建新的语音播放线程
+    tts_thread_ = std::make_unique<std::thread>(
+        [this, text]() {
+            std::lock_guard<std::mutex> lock(tts_mutex_);
+            this->speak_thread(text);
+        }
+    );
+}
+
+    // tts服务的回调函数
+void StateMachine::speak_thread(const std::string& text) {
+    if (!voice_enable_) {
+        ROS_DEBUG("Voice prompts are disabled");
+        return;
+    }
+
+    try {
+        audio_compass::TextToSpeech srv;
+        srv.request.text = text;
+        srv.request.language = "zh";
+
+        ROS_INFO("Trying to speak: %s", text.c_str());
+        if (ttsClient.call(srv)) {
+            if (srv.response.success) {
+                ROS_INFO("语音合成成功: %s", text.c_str());
+            } else {
+                ROS_ERROR("语音合成失败: %s", srv.response.message.c_str());
+            }
+        } else {
+            ROS_ERROR("TTS服务调用失败");
+        }
+    } catch (const ros::Exception& e) {
+        ROS_ERROR("TTS服务异常: %s", e.what());
     }
 }
 

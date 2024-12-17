@@ -3,9 +3,12 @@
 
 #include <ros/ros.h>
 #include <string>
-#include "direction_calculator.h"
+#include <thread>
+#include <mutex>
+#include <memory>
 #include <audio_compass/TextToSpeech.h>
 #include <std_msgs/String.h>
+#include "direction_calculator.h"
 
 class StateMachine {
 public:
@@ -20,6 +23,12 @@ public:
     };
 
     StateMachine(ros::NodeHandle& nh);
+    ~StateMachine() {
+        if (tts_thread_ && tts_thread_->joinable()) {
+            tts_thread_->join();
+        }
+    }
+
     void update(DirectionCalculator::Direction direction);
     State getCurrentState() const { return currentState; }
 
@@ -27,11 +36,18 @@ private:
     void transitionTo(State newState);
     void speakDirectionChange(const std::string& text);
     void publishDirection(const std::string& direction);
+    void async_speak(const std::string& text);
+    void speak_thread(const std::string& text);
 
     State currentState;
     ros::Publisher directionPub;
     ros::ServiceClient ttsClient;
     ros::Time lastStateChange;
+
+    // 线程相关成员
+    std::unique_ptr<std::thread> tts_thread_;
+    std::mutex tts_mutex_;
+
     double stateChangeDelay;
     bool voice_enable_;
 };
