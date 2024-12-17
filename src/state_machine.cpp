@@ -6,9 +6,13 @@ StateMachine::StateMachine(ros::NodeHandle& nh)
     nh.param("/direction_indicator/state_change_delay", stateChangeDelay, 2.0);
     nh.param("/direction_indicator/voice_enable", voice_enable_, true);
 
+    ROS_INFO("StateMachine initialized with voice_enable_: %s", voice_enable_ ? "true" : "false");
+
     lastStateChange = ros::Time::now();
     directionPub = nh.advertise<std_msgs::String>("/direction_indicator", 1);
     tts_client_ = std::make_unique<audio_compass::TTSClient>(nh, "/text_to_speech", 10.0);
+
+    ROS_INFO("TTS client created");
 }
 
 void StateMachine::handleTTSCallback(bool success, const std::string& message) {
@@ -64,19 +68,34 @@ void StateMachine::transitionTo(State newState) {
             break;
     }
 
-    ROS_INFO("状态转换: %s, 播放语音: %s", direction.c_str(), speechText.c_str());
+    ROS_INFO("=== State Transition ===");
+    ROS_INFO("From: %d, To: %d", static_cast<int>(currentState), static_cast<int>(newState));
+    ROS_INFO("Direction: %s", direction.c_str());
+    ROS_INFO("Speech Text: %s", speechText.c_str());
+    ROS_INFO("Voice Enable: %s", voice_enable_ ? "true" : "false");
+    ROS_INFO("TTS Client Valid: %s", tts_client_ ? "yes" : "no");
 
     // 发布方向
     publishDirection(direction);
 
     // 语音提示
     if (voice_enable_) {
-        tts_client_->speakAsync(
-            speechText,
-            [this](bool success, const std::string& message) {
-                this->handleTTSCallback(success, message);
-            }
-        );
+        if (tts_client_) {
+            ROS_INFO("Attempting to speak: %s", speechText.c_str());
+            tts_client_->speakAsync(
+                speechText,
+                [this, speechText](bool success, const std::string& message) {
+                    ROS_INFO("TTS Callback - Text: '%s', Success: %s, Message: %s",
+                            speechText.c_str(),
+                            success ? "true" : "false",
+                            message.c_str());
+                }
+            );
+        } else {
+            ROS_ERROR("TTS client is null!");
+        }
+    } else {
+        ROS_INFO("Voice is disabled, skipping speech");
     }
 
     // 更新状态
