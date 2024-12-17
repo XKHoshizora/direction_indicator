@@ -4,7 +4,7 @@ direction_indicator:
     # 路径分析参数
     look_ahead_distance: 1.5      # 前瞻距离 (meters)
     turn_threshold_degrees: 20.0  # 转向角度阈值 (degrees)
-    state_change_delay: 2.0      # 状态改变最小时间间隔 (seconds)
+    state_change_delay: 0.5      # 状态改变最小时间间隔 (seconds)
 
     # 速度阈值
     linear_velocity_threshold: 0.05    # m/s
