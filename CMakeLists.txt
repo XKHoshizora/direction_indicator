@@ -81,7 +81,9 @@ install(TARGETS direction_calculator state_machine tts_client
 
 install(DIRECTORY include/${PROJECT_NAME}/
     DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
-    FILES_MATCHING PATTERN "*.h" "*.hpp"
+    FILES_MATCHING
+        PATTERN "*.h"
+        PATTERN "*.hpp"
     PATTERN ".svn" EXCLUDE
 )
 
