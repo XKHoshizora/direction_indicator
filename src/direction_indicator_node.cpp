@@ -55,7 +55,7 @@ private:
 
     void pathCallback(const nav_msgs::Path::ConstPtr& msg) {
         // 如果导航未激活，且不是原地转向，直接返回
-        if (!navigation_active_ && !calculator_.isRotatingInPlace(*msg)) {
+        if (!navigation_active_ && !calculator_->isRotatingInPlace(*msg)) {
             return;
         }
 
@@ -69,12 +69,12 @@ private:
             DirectionCalculator::Direction direction;
 
             // 检查是否接近目标点
-            if (calculator_.isNearGoal(*msg)) {
+            if (calculator_->isNearGoal(*msg)) {
                 ROS_DEBUG("Near goal, preparing to stop");
                 direction = DirectionCalculator::Direction::STOP;
             } else {
                 // 计算前进方向
-                direction = calculator_.calculateDirection(*msg, lookAheadDistance_);
+                direction = calculator_->calculateDirection(*msg, lookAheadDistance_);
 
                 if (direction == DirectionCalculator::Direction::UNKNOWN) {
                     ROS_WARN_THROTTLE(1.0, "Unable to determine direction");
