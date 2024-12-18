@@ -10,10 +10,5 @@
         <!-- 增加重新启动选项 -->
         <param name="respawn" value="true"/>
         <param name="respawn_delay" value="5"/>
-
-        <!-- 添加调试参数 -->
-        <param name="debug" value="true"/>
-        <!-- 添加日志级别 -->
-        <param name="log_level" value="debug"/>
     </node>
 </launch>

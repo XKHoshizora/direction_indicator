@@ -26,8 +26,12 @@ public:
     }
 
     ~DirectionIndicatorNode() {
-        if (pathSub_) pathSub_.shutdown();
-        if (status_sub_) status_sub_.shutdown();
+        if (pathSub_) {
+            pathSub_.shutdown();
+        }
+        if (status_sub_) {
+            status_sub_.shutdown();
+        }
     }
 
 private:
@@ -43,14 +47,12 @@ private:
 
     void pathCallback(const nav_msgs::Path::ConstPtr& msg) {
         // 检查导航状态和路径有效性
-        if (msg->poses.empty()) {
-            ROS_WARN_THROTTLE(1.0, "Received empty path");
+        if (!navigation_active_ && !calculator_->isRotatingInPlace(*msg)) {
             return;
         }
 
-        // 即使导航未激活，也允许处理旋转动作
-        if (!navigation_active_ && !calculator_->isRotatingInPlace(*msg)) {
-            ROS_DEBUG_THROTTLE(1.0, "Navigation not active and not rotating");
+        if (msg->poses.empty()) {
+            ROS_WARN_THROTTLE(1.0, "Received empty path");
             return;
         }
 
@@ -60,18 +62,14 @@ private:
             // 判断是否接近目标点
             if (calculator_->isNearGoal(*msg)) {
                 direction = DirectionCalculator::Direction::STOP;
-                ROS_INFO_THROTTLE(1.0, "Near goal, preparing to stop");
             } else {
                 direction = calculator_->calculateDirection(*msg, lookAheadDistance_);
 
                 if (direction == DirectionCalculator::Direction::UNKNOWN) {
-                    ROS_WARN_THROTTLE(1.0, "Unable to determine direction");
+                    ROS_WARN_THROTTLE(1.0, "无法确定方向");
                     return;
                 }
             }
-
-            // 添加调试信息
-            ROS_DEBUG("Calculated direction: %d", static_cast<int>(direction));
 
             // 更新状态机
             stateMachine_->update(direction);

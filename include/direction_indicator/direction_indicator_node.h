@@ -16,7 +16,7 @@ private:
     void pathCallback(const nav_msgs::Path::ConstPtr& msg);
     void moveBaseStatusCallback(const actionlib_msgs::GoalStatusArray::ConstPtr& msg);
 
-    ros::NodeHandle nh;
+    ros::NodeHandle nh_;
     ros::Subscriber pathSub_;
     ros::Subscriber status_sub_;
     std::unique_ptr<DirectionCalculator> calculator_;

@@ -30,7 +30,6 @@ private:
     void publishDirection(const std::string& direction);
     void handleTTSCallback(bool success, const std::string& message);
 
-    mutable std::mutex state_mutex_;
     State currentState;
     ros::Publisher directionPub;
     std::unique_ptr<audio_compass::TTSClient> tts_client_;
