@@ -1,6 +1,10 @@
 #include "direction_indicator/direction_calculator.h"
 
-DirectionCalculator::DirectionCalculator() : tfListener(tfBuffer) {
+DirectionCalculator::DirectionCalculator()
+    : tfListener(tfBuffer)
+    , current_status_(RobotStatus::UNKNOWN)
+    , move_base_status_(actionlib_msgs::GoalStatus::PENDING) {
+
     ros::NodeHandle nh("~");
 
     // 从参数服务器获取配置
@@ -13,10 +17,19 @@ DirectionCalculator::DirectionCalculator() : tfListener(tfBuffer) {
     nh.param("/direction_indicator/early_warning_distance", early_warning_distance_, 1.5);
 
     cmd_vel_sub_ = nh.subscribe("/cmd_vel", 1, &DirectionCalculator::cmdVelCallback, this);
+    move_base_status_sub_ = nh.subscribe("/move_base/status", 1,
+                                        &DirectionCalculator::moveBaseStatusCallback, this);
 }
 
 void DirectionCalculator::cmdVelCallback(const geometry_msgs::TwistConstPtr& msg) {
     current_vel_ = *msg;
+}
+
+void DirectionCalculator::moveBaseStatusCallback(
+    const actionlib_msgs::GoalStatusArray::ConstPtr& msg) {
+    if (!msg->status_list.empty()) {
+        move_base_status_ = msg->status_list.back().status;
+    }
 }
 
 bool DirectionCalculator::isRotatingInPlace(const nav_msgs::Path& path) {
@@ -24,11 +37,33 @@ bool DirectionCalculator::isRotatingInPlace(const nav_msgs::Path& path) {
                    std::abs(current_vel_.linear.y) < linear_velocity_threshold_;
     bool is_rotating = std::abs(current_vel_.angular.z) > angular_velocity_threshold_;
 
-    return is_still && is_rotating;
+    // 判断是否处于到达目标点后的最终旋转
+    if (is_still && is_rotating && isNearGoal(path)) {
+        current_status_ = RobotStatus::ROTATING_TO_GOAL;
+        return false;  // 不触发普通的原地旋转提示
+    }
+
+    // 普通导航过程中的原地旋转
+    if (is_still && is_rotating) {
+        current_status_ = RobotStatus::NAVIGATING;
+        return true;
+    }
+
+    return false;
 }
 
 DirectionCalculator::Direction DirectionCalculator::calculateDirection(
     const nav_msgs::Path& path, double lookAheadDistance) {
+
+    // 检查是否到达目标点
+    if (current_status_ == RobotStatus::REACHED_GOAL) {
+        return Direction::STOP;
+    }
+
+    // 检查是否在最终旋转
+    if (current_status_ == RobotStatus::ROTATING_TO_GOAL) {
+        return Direction::UNKNOWN;
+    }
 
     // 检查原地转向
     if (isRotatingInPlace(path)) {
@@ -62,8 +97,10 @@ DirectionCalculator::Direction DirectionCalculator::calculateDirection(
 
         // 判断方向
         if (std::abs(turnAngle) < turnThreshold) {
+            current_status_ = RobotStatus::NAVIGATING;
             return Direction::STRAIGHT;
         }
+        current_status_ = RobotStatus::NAVIGATING;
         return (turnAngle > 0) ? Direction::LEFT : Direction::RIGHT;
     }
     catch (tf2::TransformException& ex) {
@@ -146,23 +183,42 @@ bool DirectionCalculator::findLookAheadPoint(
 }
 
 bool DirectionCalculator::isNearGoal(const nav_msgs::Path& path, double threshold) {
-    if (path.poses.empty()) {
-        return false;
+    if (!path.poses.empty()) {
+        try {
+            geometry_msgs::TransformStamped transform = tfBuffer.lookupTransform(
+                path.header.frame_id, "base_link", ros::Time(0), ros::Duration(1.0));
+
+            const auto& goal = path.poses.back().pose.position;
+            double distance = std::sqrt(
+                std::pow(goal.x - transform.transform.translation.x, 2) +
+                std::pow(goal.y - transform.transform.translation.y, 2));
+
+            if (distance < threshold) {
+                // 检查是否真正完成导航
+                if (move_base_status_ == actionlib_msgs::GoalStatus::SUCCEEDED) {
+                    current_status_ = RobotStatus::REACHED_GOAL;
+                    return true;
+                }
+                // 还在最终调整阶段
+                else {
+                    bool is_still = std::abs(current_vel_.linear.x) < linear_velocity_threshold_ &&
+                                  std::abs(current_vel_.linear.y) < linear_velocity_threshold_;
+                    bool is_rotating = std::abs(current_vel_.angular.z) > angular_velocity_threshold_;
+
+                    if (is_still && is_rotating) {
+                        current_status_ = RobotStatus::ROTATING_TO_GOAL;
+                        return false;
+                    }
+                }
+            }
+
+            current_status_ = RobotStatus::NAVIGATING;
+        }
+        catch (tf2::TransformException& ex) {
+            ROS_WARN("Transform lookup failed in isNearGoal: %s", ex.what());
+            current_status_ = RobotStatus::UNKNOWN;
+        }
     }
 
-    try {
-        geometry_msgs::TransformStamped transform = tfBuffer.lookupTransform(
-            path.header.frame_id, "base_link", ros::Time(0), ros::Duration(1.0));
-
-        const auto& goal = path.poses.back().pose.position;
-        double distance = std::sqrt(
-            std::pow(goal.x - transform.transform.translation.x, 2) +
-            std::pow(goal.y - transform.transform.translation.y, 2));
-
-        return distance < threshold;
-    }
-    catch (tf2::TransformException& ex) {
-        ROS_WARN("Transform lookup failed in isNearGoal: %s", ex.what());
-        return false;
-    }
+    return false;
 }
