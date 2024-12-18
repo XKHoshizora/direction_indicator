@@ -45,6 +45,9 @@ DirectionCalculator::Direction DirectionCalculator::calculateDirection(
         return Direction::UNKNOWN;
     }
 
+    // 输出路径信息
+    ROS_INFO_THROTTLE(1.0, "Path size: %zu", path.poses.size());
+
     // 检查是否在原地旋转
     if (isRotatingInPlace(path)) {
         std::lock_guard<std::mutex> lock(velocity_mutex_);
@@ -57,18 +60,61 @@ DirectionCalculator::Direction DirectionCalculator::calculateDirection(
     try {
         // 获取未来路径点
         std::vector<geometry_msgs::Point> future_path = extractFuturePath(path, lookAheadDistance);
-        if (future_path.empty()) {
-            ROS_DEBUG("No future path points extracted");
+
+        // 输出提取的路径点数量
+        ROS_INFO_THROTTLE(1.0, "Extracted future path points: %zu", future_path.size());
+
+        if (future_path.size() < 3) {
+            ROS_DEBUG("Not enough future path points for curvature calculation");
+            // 如果点太少，但至少有两个点，尝试用简单的角度判断
+            if (future_path.size() == 2) {
+                const auto& p1 = future_path[0];
+                const auto& p2 = future_path[1];
+                double angle = atan2(p2.y - p1.y, p2.x - p1.x);
+
+                // 输出角度信息
+                ROS_INFO_THROTTLE(1.0, "Simple angle calculation: %.2f degrees", angle * 180.0 / M_PI);
+
+                // 使用更小的阈值进行判断
+                constexpr double simple_angle_threshold = 10.0 * M_PI / 180.0; // 10度
+                if (std::abs(angle) < simple_angle_threshold) {
+                    return Direction::STRAIGHT;
+                } else {
+                    return angle > 0 ? Direction::LEFT : Direction::RIGHT;
+                }
+            }
             return Direction::UNKNOWN;
         }
 
-        // 计算曲率
+        // 计算曲率并输出详细信息
+        for (size_t i = 1; i < future_path.size() - 1; ++i) {
+            const auto& p1 = future_path[i-1];
+            const auto& p2 = future_path[i];
+            const auto& p3 = future_path[i+1];
+
+            // 计算向量
+            double dx1 = p2.x - p1.x;
+            double dy1 = p2.y - p1.y;
+            double dx2 = p3.x - p2.x;
+            double dy2 = p3.y - p2.y;
+
+            // 计算角度变化
+            double angle = atan2(dy2, dx2) - atan2(dy1, dx1);
+            while (angle > M_PI) angle -= 2 * M_PI;
+            while (angle < -M_PI) angle += 2 * M_PI;
+
+            // 输出每个三点组的角度变化
+            ROS_DEBUG("Points %zu-%zu-%zu angle: %.2f degrees",
+                     i-1, i, i+1, angle * 180.0 / M_PI);
+        }
+
+        // 计算总体曲率
         double max_curvature = calculateMaxCurvature(future_path);
-        ROS_INFO_THROTTLE(1.0, "Current max curvature: %.2f (threshold: %.2f)",
+        ROS_INFO_THROTTLE(1.0, "Max curvature: %.4f (threshold: %.4f)",
                          max_curvature, turnThreshold);
 
-        // 调整曲率阈值判断
-        if (max_curvature < turnThreshold) {
+        // 降低曲率阈值，使其更容易检测到转向
+        if (max_curvature < turnThreshold * 0.5) { // 使用原阈值的一半
             ROS_DEBUG_THROTTLE(1.0, "Moving straight (curvature below threshold)");
             return Direction::STRAIGHT;
         } else {

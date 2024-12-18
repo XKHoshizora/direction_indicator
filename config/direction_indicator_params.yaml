@@ -1,8 +1,8 @@
 # config/direction_indicator_params.yaml
 
 direction_indicator:
-    look_ahead_distance: 5.0      # 前瞻距离 (meters)
-    turn_threshold_degrees: 20.0  # 转向曲率阈值对应的角度 (degrees)
+    look_ahead_distance: 2.0      # 前瞻距离 (meters)
+    turn_threshold_degrees: 10.0  # 转向曲率阈值对应的角度 (degrees)
     state_change_delay: 0.3       # 状态改变最小时间间隔 (seconds)
 
     # 速度阈值
