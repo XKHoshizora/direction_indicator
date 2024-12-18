@@ -26,12 +26,8 @@ public:
     }
 
     ~DirectionIndicatorNode() {
-        if (pathSub_) {
-            pathSub_.shutdown();
-        }
-        if (status_sub_) {
-            status_sub_.shutdown();
-        }
+        if (pathSub_) pathSub_.shutdown();
+        if (status_sub_) status_sub_.shutdown();
     }
 
 private:

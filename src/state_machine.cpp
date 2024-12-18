@@ -24,6 +24,7 @@ void StateMachine::handleTTSCallback(bool success, const std::string& message) {
 }
 
 void StateMachine::transitionTo(State newState) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
     if (currentState == newState) {
         return;
     }
@@ -110,6 +111,8 @@ void StateMachine::publishDirection(const std::string& direction) {
 }
 
 void StateMachine::update(DirectionCalculator::Direction direction) {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+
     // 防止过于频繁的状态改变
     if ((ros::Time::now() - lastStateChange).toSec() < stateChangeDelay) {
         return;
