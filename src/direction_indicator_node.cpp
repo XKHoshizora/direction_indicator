@@ -41,7 +41,7 @@ private:
         }
     }
 
-    void DirectionIndicatorNode::pathCallback(const nav_msgs::Path::ConstPtr& msg) {
+    void pathCallback(const nav_msgs::Path::ConstPtr& msg) {
         // 检查导航状态和路径有效性
         if (msg->poses.empty()) {
             ROS_WARN_THROTTLE(1.0, "Received empty path");
