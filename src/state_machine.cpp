@@ -34,37 +34,44 @@ void StateMachine::transitionTo(State newState) {
     switch (newState) {
         case State::STRAIGHT:
             direction = "STRAIGHT";
-            speechText = "直行";
+            // speechText = "直行";
+            speechText = "直進します";
             break;
 
         case State::TURN_LEFT_ANTICIPATED:
             direction = "LEFT";
-            speechText = "即将左转";
+            // speechText = "即将左转";
+            speechText = "左へ曲がります";
             break;
 
         case State::TURN_RIGHT_ANTICIPATED:
             direction = "RIGHT";
-            speechText = "即将右转";
+            // speechText = "即将右转";
+            speechText = "右へ曲がります";
             break;
 
         case State::TURNING_LEFT_IN_PLACE:
             direction = "ROTATE_LEFT";
-            speechText = "开始左转";
+            // speechText = "开始左转";
+            speechText = "左回転します";
             break;
 
         case State::TURNING_RIGHT_IN_PLACE:
             direction = "ROTATE_RIGHT";
-            speechText = "开始右转";
+            // speechText = "开始右转";
+            speechText = "右回転します";
             break;
 
         case State::STOP_ANTICIPATED:
             direction = "STOP";
-            speechText = "准备停止";
+            // speechText = "准备停止";
+            speechText = "停止します";
             break;
 
         case State::STOPPED:
             direction = "STOPPED";
-            speechText = "已到达目的地";
+            // speechText = "已到达目的地";
+            speechText = "到達しました";
             break;
     }
 
