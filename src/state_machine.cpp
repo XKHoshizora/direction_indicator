@@ -9,7 +9,7 @@ StateMachine::StateMachine(ros::NodeHandle& nh)
     ROS_INFO("StateMachine initialized with voice_enable_: %s", voice_enable_ ? "true" : "false");
 
     lastStateChange = ros::Time::now();
-    directionPub = nh.advertise<std_msgs::String>("/direction_indicator/indicator", 1);
+    directionPub = nh.advertise<std_msgs::String>("/direction_indicator/direction", 1);
     tts_client_ = std::make_unique<audio_compass::TTSClient>(nh, "/text_to_speech", 10.0);
 
     ROS_INFO("TTS client created");
