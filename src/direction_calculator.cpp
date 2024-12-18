@@ -3,13 +3,22 @@
 DirectionCalculator::DirectionCalculator() : tfListener(tfBuffer) {
     ros::NodeHandle nh("~");
 
-    // 从参数服务器获取配置
-    nh.param("/direction_indicator/turn_threshold_degrees", turnThreshold, 20.0);
+    // 调整默认阈值，使其更容易触发转向状态
+    double default_threshold = 0.2;  // 降低阈值，使其更容易检测到转向
+    nh.param("/direction_indicator/turn_threshold_degrees", turnThreshold, default_threshold);
     turnThreshold = turnThreshold * M_PI / 180.0;
 
+    // 获取其他参数
     nh.param("/direction_indicator/linear_velocity_threshold", linear_velocity_threshold_, 0.05);
     nh.param("/direction_indicator/angular_velocity_threshold", angular_velocity_threshold_, 0.1);
     nh.param("/direction_indicator/early_warning_distance", early_warning_distance_, 1.5);
+
+    // 输出初始化参数
+    ROS_INFO("DirectionCalculator initialized with:");
+    ROS_INFO("- Turn threshold: %.2f rad (%.2f degrees)", turnThreshold, turnThreshold * 180.0 / M_PI);
+    ROS_INFO("- Linear velocity threshold: %.2f m/s", linear_velocity_threshold_);
+    ROS_INFO("- Angular velocity threshold: %.2f rad/s", angular_velocity_threshold_);
+    ROS_INFO("- Early warning distance: %.2f m", early_warning_distance_);
 
     cmd_vel_sub_ = nh.subscribe("/cmd_vel", 1, &DirectionCalculator::cmdVelCallback, this);
 }
@@ -32,39 +41,46 @@ DirectionCalculator::Direction DirectionCalculator::calculateDirection(
     const nav_msgs::Path& path, double lookAheadDistance) {
 
     if (path.poses.size() < 2) {
+        ROS_DEBUG("Path too short");
         return Direction::UNKNOWN;
     }
 
-    // 首先检查是否在原地旋转
+    // 检查是否在原地旋转
     if (isRotatingInPlace(path)) {
         std::lock_guard<std::mutex> lock(velocity_mutex_);
         if (std::abs(current_vel_.angular.z) > angular_velocity_threshold_) {
-            ROS_DEBUG("Rotating in place detected: %f rad/s", current_vel_.angular.z);
+            ROS_INFO_THROTTLE(1.0, "Rotating in place: %.2f rad/s", current_vel_.angular.z);
             return current_vel_.angular.z > 0 ? Direction::ROTATE_LEFT : Direction::ROTATE_RIGHT;
         }
     }
 
     try {
-        // 提取未来路径点
+        // 获取未来路径点
         std::vector<geometry_msgs::Point> future_path = extractFuturePath(path, lookAheadDistance);
         if (future_path.empty()) {
-            ROS_WARN_THROTTLE(1.0, "No future path points found");
+            ROS_DEBUG("No future path points extracted");
             return Direction::UNKNOWN;
         }
 
         // 计算曲率
         double max_curvature = calculateMaxCurvature(future_path);
-        ROS_DEBUG("Max curvature: %f, threshold: %f", max_curvature, turnThreshold);
+        ROS_INFO_THROTTLE(1.0, "Current max curvature: %.2f (threshold: %.2f)",
+                         max_curvature, turnThreshold);
 
-        // 根据曲率决定方向
+        // 调整曲率阈值判断
         if (max_curvature < turnThreshold) {
+            ROS_DEBUG_THROTTLE(1.0, "Moving straight (curvature below threshold)");
             return Direction::STRAIGHT;
         } else {
-            return determineTurnDirection(future_path);
+            // 确定转向方向
+            Direction turn_direction = determineTurnDirection(future_path);
+            ROS_INFO_THROTTLE(1.0, "Turn detected: %s",
+                            turn_direction == Direction::LEFT ? "LEFT" : "RIGHT");
+            return turn_direction;
         }
 
     } catch (tf2::TransformException& ex) {
-        ROS_WARN_THROTTLE(1.0, "Transform lookup failed: %s", ex.what());
+        ROS_WARN("Transform lookup failed: %s", ex.what());
         return Direction::UNKNOWN;
     }
 }
@@ -112,34 +128,63 @@ std::vector<geometry_msgs::Point> DirectionCalculator::extractFuturePath(
 double DirectionCalculator::calculateMaxCurvature(
     const std::vector<geometry_msgs::Point>& path) const {
 
-    if (path.size() < 3) return 0.0;
+    if (path.size() < 3) {
+        ROS_DEBUG("Path too short for curvature calculation");
+        return 0.0;
+    }
 
     double max_curvature = 0.0;
-    std::vector<double> segment_lengths(path.size() - 1);
 
-    // 预计算段长度
-    for (size_t i = 0; i < path.size() - 1; ++i) {
-        const auto& p1 = path[i];
-        const auto& p2 = path[i + 1];
-        segment_lengths[i] = std::hypot(p2.x - p1.x, p2.y - p1.y);
-    }
+    // 用于调试的点记录
+    std::vector<double> curvatures;
 
     for (size_t i = 1; i < path.size() - 1; ++i) {
         const auto& p1 = path[i - 1];
         const auto& p2 = path[i];
         const auto& p3 = path[i + 1];
 
-        // 使用已计算的段长度
-        double d1 = segment_lengths[i - 1];
-        double d2 = segment_lengths[i];
+        // 计算两个向量
+        double dx1 = p2.x - p1.x;
+        double dy1 = p2.y - p1.y;
+        double dx2 = p3.x - p2.x;
+        double dy2 = p3.y - p2.y;
 
-        if (d1 < 1e-6 || d2 < 1e-6) continue;
+        // 计算向量长度
+        double l1 = std::sqrt(dx1 * dx1 + dy1 * dy1);
+        double l2 = std::sqrt(dx2 * dx2 + dy2 * dy2);
 
-        // 计算曲率
-        double cross_product = std::abs((p2.x - p1.x) * (p3.y - p2.y) -
-                                      (p2.y - p1.y) * (p3.x - p2.x));
-        double curvature = cross_product / (d1 * d2 * (d1 + d2));
+        // 防止除零
+        if (l1 < 1e-6 || l2 < 1e-6) {
+            continue;
+        }
+
+        // 计算角度变化（弧度）
+        double angle_change = std::atan2(dy2, dx2) - std::atan2(dy1, dx1);
+
+        // 标准化角度到 [-π, π]
+        while (angle_change > M_PI) angle_change -= 2 * M_PI;
+        while (angle_change < -M_PI) angle_change += 2 * M_PI;
+
+        // 计算曲率（角度变化/路径长度）
+        double curvature = std::abs(angle_change) / ((l1 + l2) / 2.0);
+        curvatures.push_back(curvature);
         max_curvature = std::max(max_curvature, curvature);
+
+        // 添加调试信息
+        ROS_DEBUG("Point %zu: angle_change=%.2f, curvature=%.2f",
+                  i, angle_change, curvature);
+    }
+
+    // 输出曲率统计信息
+    if (!curvatures.empty()) {
+        double avg_curvature = 0.0;
+        for (double c : curvatures) {
+            avg_curvature += c;
+        }
+        avg_curvature /= curvatures.size();
+
+        ROS_DEBUG("Curvature stats - Max: %.2f, Avg: %.2f, Threshold: %.2f",
+                  max_curvature, avg_curvature, turnThreshold);
     }
 
     return max_curvature;
