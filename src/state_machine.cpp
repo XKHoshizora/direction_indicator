@@ -49,12 +49,12 @@ void StateMachine::transitionTo(State newState) {
 
         case State::TURNING_LEFT_IN_PLACE:
             direction = "ROTATE_LEFT";
-            speechText = "开始左转";
+            speechText = "左转";
             break;
 
         case State::TURNING_RIGHT_IN_PLACE:
             direction = "ROTATE_RIGHT";
-            speechText = "开始右转";
+            speechText = "右转";
             break;
 
         case State::STOP_ANTICIPATED:
@@ -147,11 +147,8 @@ void StateMachine::update(DirectionCalculator::Direction direction) {
             break;
 
         case DirectionCalculator::Direction::STOP:
-            if (currentState != State::STOP_ANTICIPATED &&
-                currentState != State::STOPPED) {
+            if (currentState != State::STOP_ANTICIPATED) {
                 transitionTo(State::STOP_ANTICIPATED);
-            } else if (currentState == State::STOP_ANTICIPATED) {
-                transitionTo(State::STOPPED);
             }
             break;
 
