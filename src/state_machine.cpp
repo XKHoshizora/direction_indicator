@@ -120,50 +120,53 @@ void StateMachine::publishDirection(const std::string& direction) {
 void StateMachine::update(DirectionCalculator::Direction direction) {
     std::lock_guard<std::mutex> lock(state_mutex_);
 
-    // 防止过于频繁的状态改变
-    if ((ros::Time::now() - lastStateChange).toSec() < stateChangeDelay) {
+    // 记录当前时间
+    ros::Time now = ros::Time::now();
+
+    // 检查状态更新间隔
+    if ((now - lastStateChange).toSec() < stateChangeDelay) {
+        ROS_DEBUG_THROTTLE(1.0, "State change too frequent, skipping update");
         return;
     }
 
+    // 添加调试信息
+    ROS_DEBUG("Updating state machine with direction: %d", static_cast<int>(direction));
+
+    // 根据不同方向更新状态
+    State newState;
     switch (direction) {
         case DirectionCalculator::Direction::STRAIGHT:
-            if (currentState != State::STRAIGHT) {
-                transitionTo(State::STRAIGHT);
-            }
+            newState = State::STRAIGHT;
             break;
 
         case DirectionCalculator::Direction::LEFT:
-            if (currentState != State::TURN_LEFT_ANTICIPATED) {
-                transitionTo(State::TURN_LEFT_ANTICIPATED);
-            }
+            newState = State::TURN_LEFT_ANTICIPATED;
             break;
 
         case DirectionCalculator::Direction::RIGHT:
-            if (currentState != State::TURN_RIGHT_ANTICIPATED) {
-                transitionTo(State::TURN_RIGHT_ANTICIPATED);
-            }
+            newState = State::TURN_RIGHT_ANTICIPATED;
             break;
 
         case DirectionCalculator::Direction::ROTATE_LEFT:
-            if (currentState != State::TURNING_LEFT_IN_PLACE) {
-                transitionTo(State::TURNING_LEFT_IN_PLACE);
-            }
+            newState = State::TURNING_LEFT_IN_PLACE;
             break;
 
         case DirectionCalculator::Direction::ROTATE_RIGHT:
-            if (currentState != State::TURNING_RIGHT_IN_PLACE) {
-                transitionTo(State::TURNING_RIGHT_IN_PLACE);
-            }
+            newState = State::TURNING_RIGHT_IN_PLACE;
             break;
 
         case DirectionCalculator::Direction::STOP:
-            if (currentState != State::STOP_ANTICIPATED) {
-                transitionTo(State::STOP_ANTICIPATED);
-            }
+            newState = State::STOP_ANTICIPATED;
             break;
 
         default:
-            // 未知状态不进行转换
-            break;
+            ROS_WARN_THROTTLE(1.0, "Unknown direction received");
+            return;
+    }
+
+    // 只有在状态真正改变时才进行转换
+    if (currentState != newState) {
+        ROS_INFO("State transition: %d -> %d", static_cast<int>(currentState), static_cast<int>(newState));
+        transitionTo(newState);
     }
 }

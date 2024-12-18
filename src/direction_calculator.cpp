@@ -31,37 +31,37 @@ bool DirectionCalculator::isRotatingInPlace(const nav_msgs::Path& path) const {
 DirectionCalculator::Direction DirectionCalculator::calculateDirection(
     const nav_msgs::Path& path, double lookAheadDistance) {
 
-    if (path.poses.size() < 3) {
+    if (path.poses.size() < 2) {
         return Direction::UNKNOWN;
     }
 
+    // 首先检查是否在原地旋转
     if (isRotatingInPlace(path)) {
         std::lock_guard<std::mutex> lock(velocity_mutex_);
-        return current_vel_.angular.z > 0 ? Direction::ROTATE_LEFT : Direction::ROTATE_RIGHT;
+        if (std::abs(current_vel_.angular.z) > angular_velocity_threshold_) {
+            ROS_DEBUG("Rotating in place detected: %f rad/s", current_vel_.angular.z);
+            return current_vel_.angular.z > 0 ? Direction::ROTATE_LEFT : Direction::ROTATE_RIGHT;
+        }
     }
 
     try {
-        // 使用缓存的transform
-        geometry_msgs::TransformStamped transform;
-        {
-            ros::Time now = ros::Time::now();
-            if ((now - last_transform_time_).toSec() > transform_cache_duration_) {
-                transform = tfBuffer.lookupTransform(
-                    path.header.frame_id, "base_link", ros::Time(0), ros::Duration(1.0));
-                cached_transform_ = transform;
-                last_transform_time_ = now;
-            } else {
-                transform = cached_transform_;
-            }
-        }
-
+        // 提取未来路径点
         std::vector<geometry_msgs::Point> future_path = extractFuturePath(path, lookAheadDistance);
         if (future_path.empty()) {
+            ROS_WARN_THROTTLE(1.0, "No future path points found");
             return Direction::UNKNOWN;
         }
 
+        // 计算曲率
         double max_curvature = calculateMaxCurvature(future_path);
-        return (max_curvature < turnThreshold) ? Direction::STRAIGHT : determineTurnDirection(future_path);
+        ROS_DEBUG("Max curvature: %f, threshold: %f", max_curvature, turnThreshold);
+
+        // 根据曲率决定方向
+        if (max_curvature < turnThreshold) {
+            return Direction::STRAIGHT;
+        } else {
+            return determineTurnDirection(future_path);
+        }
 
     } catch (tf2::TransformException& ex) {
         ROS_WARN_THROTTLE(1.0, "Transform lookup failed: %s", ex.what());
