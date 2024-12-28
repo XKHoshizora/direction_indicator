@@ -1,6 +1,8 @@
 #include "direction_indicator/direction_calculator.h"
 
 DirectionCalculator::DirectionCalculator() : tfListener(tfBuffer) {
+    setlocal(LC_ALL, "");  // 设置为空字符串，避免中文乱码
+
     ros::NodeHandle nh("~");
 
     // 从参数服务器获取配置

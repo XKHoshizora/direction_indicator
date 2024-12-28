@@ -8,6 +8,8 @@
 class DirectionIndicatorNode {
 public:
     DirectionIndicatorNode() : nh_("~"), navigation_active_(false) {
+        setlocal(LC_ALL, "");  // 设置为空字符串，避免中文乱码
+
         // 从参数服务器获取参数
         nh_.param("/direction_indicator/look_ahead_distance", lookAheadDistance_, 1.5);
 

@@ -3,6 +3,8 @@
 StateMachine::StateMachine(ros::NodeHandle& nh)
     : currentState(State::STRAIGHT) {
 
+    setlocal(LC_ALL, "");  // 设置为空字符串，避免中文乱码
+
     nh.param("/direction_indicator/state_change_delay", stateChangeDelay, 2.0);
     nh.param("/direction_indicator/voice_enable", voice_enable_, true);
 

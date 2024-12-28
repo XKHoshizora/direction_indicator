@@ -14,6 +14,8 @@ TTSClient::TTSClient(ros::NodeHandle nh,
     , timeout_sec_(timeout_sec)
     , is_processing_(false)
 {
+    setlocal(LC_ALL, "");  // 设置为空字符串，避免中文乱码
+
     startProcessing();
 }
 
